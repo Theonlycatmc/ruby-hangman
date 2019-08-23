@@ -143,8 +143,13 @@ class Game
     end
     @current_word.split('').each_with_index { |letter, index| @current_word_display[index] = letter if letter == @choice }
   end
+
   def save(filename)
-    if File.exist?(filename)
+    if filename == ''
+      print "That is not a vaild filename, try again: "
+      filename = gets.chomp
+      save(filename)
+    elsif File.exist?(filename)
       overwrite = ''
       while overwrite != 'y' && overwrite != 'n'
         print "Do you wish to overwrite #{filename}? (Y/N): "
@@ -154,14 +159,17 @@ class Game
         File.open("saves/#{filename}.sav", 'w') do |f|
           f.write(to_json)
         end
+        puts 'See you next time!'
+        exit
       end
     else
-      File.new("saves/#{filename}.sav")
-      File.open("saves/#{filename}.sav", 'w') do |f|
+      File.new("saves/#{filename}.sav", 'w+')
+      File.open("saves/#{filename}.sav", 'w+') do |f|
         f.write(to_json)
+        puts 'See you next time!'
+        exit
       end
     end
-
   end
 
   def turn
@@ -210,8 +218,12 @@ class Game
       print 'Do you wish to restart? (Y/N) : '
       restart_choice = gets.chomp.downcase
     end
-    restart if restart_choice == 'y'
+    restart(nil,nil,nil,nil) if restart_choice == 'y'
   end
+end
+
+unless File.directory?('saves')
+  Dir.mkdir('saves')
 end
 load = ''
 while load != 'y' && load != 'n'
@@ -219,9 +231,18 @@ while load != 'y' && load != 'n'
   load = gets.chomp.downcase
 end
 if load == 'y'
-  puts 'Filename to load:'
-  savefile = gets.chomp
-  Game.from_json(File.read("saves/#{savefile}.sav"))
+  error_catch = ''
+  while error_catch != 'n'
+    puts 'Filename to load:'
+    savefile = gets.chomp
+    if File.exist?("saves/#{savefile}.sav")
+      Game.from_json(File.read("saves/#{savefile}.sav"))
+      break
+    else
+      print "Error: saves/#{savefile}.sav does not exist. Try again? (Y/N)"
+      error_catch = gets.chomp
+    end
+  end
 else
   Game.new
 end
