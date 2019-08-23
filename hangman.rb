@@ -1,3 +1,5 @@
+require 'json'
+
 class Wordlist
   def select_random_word
     @filtered_words[rand(@filtered_words.length)].downcase
@@ -13,22 +15,42 @@ class Wordlist
 end
 class Game
 
+  def to_json
+    JSON.dump ({
+      :errors => @current_failures,
+      :guesses => @current_guesses,
+      :word => @current_word,
+      :display => @current_word_display
+    })
+  end
+  def self.from_json(string)
+    data = JSON.load string
+    self.new(data['errors'], data['guesses'], data['word'], data['display'])
+  end
+
   protected
 
   @@MAX_FAILURES = 5
 
-  def restart
-    @current_failures = 0
-    @current_word = @wordlist.select_random_word
-    @current_guesses = []
-    @current_word_display = Array.new(@current_word.length, '_')
+  def restart(errors,guesses,word,display)
+    if errors.nil?
+      @current_failures = 0
+      @current_word = @wordlist.select_random_word
+      @current_guesses = []
+      @current_word_display = Array.new(@current_word.length, '_')
+    else
+      @current_failures = errors
+      @current_word = word
+      @current_guesses = guesses
+      @current_word_display = display
+    end
     @win = 0
     game_start
   end
 
-  def initialize
+  def initialize(errors=nil,guesses=nil,word=nil,display=nil)
     @wordlist = Wordlist.new
-    restart
+    restart(errors,guesses,word,display)
   end
 
   def show_stickman
@@ -121,6 +143,26 @@ class Game
     end
     @current_word.split('').each_with_index { |letter, index| @current_word_display[index] = letter if letter == @choice }
   end
+  def save(filename)
+    if File.exist?(filename)
+      overwrite = ''
+      while overwrite != 'y' && overwrite != 'n'
+        print "Do you wish to overwrite #{filename}? (Y/N): "
+        overwrite = gets.chomp.downcase
+      end
+      if overwrite == 'y'
+        File.open("saves/#{filename}.sav", 'w') do |f|
+          f.write(to_json)
+        end
+      end
+    else
+      File.new("saves/#{filename}.sav")
+      File.open("saves/#{filename}.sav", 'w') do |f|
+        f.write(to_json)
+      end
+    end
+
+  end
 
   def turn
     @choice = ''
@@ -131,9 +173,13 @@ class Game
         @win = 1
         break
       end
-      print 'Your guess: '
+      print 'Your guess (You can also type \'save\' to save your game): '
       @choice = gets.chomp
-      if @choice.length != 1
+      if @choice == 'save'
+        print 'Enter a filename:'
+        filename = gets.chomp
+        save(filename)
+      elsif @choice.length != 1
         puts 'Your guess must only be one letter long.'
         redo
       elsif @current_guesses.any? { |guess| guess == @choice }
@@ -167,4 +213,15 @@ class Game
     restart if restart_choice == 'y'
   end
 end
-Game.new
+load = ''
+while load != 'y' && load != 'n'
+  print 'Do you wish to load a game? (Y/N) : '
+  load = gets.chomp.downcase
+end
+if load == 'y'
+  puts 'Filename to load:'
+  savefile = gets.chomp
+  Game.from_json(File.read("saves/#{savefile}.sav"))
+else
+  Game.new
+end
